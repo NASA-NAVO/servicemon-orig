@@ -2,6 +2,8 @@ from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astroquery.utils import parse_coordinates
 
+import warnings
+
 import html
 import requests
 import os
@@ -26,8 +28,9 @@ class Query():
     """
     """
 
-    def __init__(self, base_name, service, coords, radius, out_dir, verbose=False):
+    def __init__(self, base_name, query_type, service, coords, radius, out_dir, verbose=False):
         self._base_name = base_name
+        self._query_type = query_type
         self._orig_service = service
         self._orig_coords = coords
         self._orig_radius = radius
@@ -41,8 +44,8 @@ class Query():
         self._query_name = self._compute_query_name()
         self._filename = self._out_path / (self._query_name + '.xml')
         
-        self._stats = QueryStats(self._query_name, 'cone', self._access_url, 
-                                 self._query_params)
+        self._stats = QueryStats(self._query_name, self._base_name, 'cone', 
+                                 self._access_url, self._query_params)
     
     @property 
     def stats(self):
@@ -72,7 +75,10 @@ class Query():
             'num_columns': -1
         }
         try:
-            t = Table.read(self._filename, format='votable')
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                t = Table.read(self._filename, format='votable')
+                
             result_meta['size'] = os.path.getsize(self._filename)
             result_meta['num_rows'] = len(t)
             result_meta['num_columns'] = len(t.columns)
@@ -114,9 +120,10 @@ class Query():
         return params
     
     def _compute_query_name(self):
-        name = (self._base_name + '_cone_' + str(self._query_params['RA']) + '_' + 
-                  str(self._query_params['DEC']) + '_' + 
-                  str(self._query_params['SR']))
+        name = (f'{self._base_name}_{self._query_type}' + 
+                f'_{str(self._query_params["RA"])}' +
+                f'_{str(self._query_params["DEC"])}' +
+                f'_{str(self._query_params["SR"])}')
         return name
 
 
